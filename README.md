@@ -6,12 +6,6 @@ AI-assisted credibility review system built across three repositories:
 2. A FastAPI backend that handles crawling and OpenAI-powered verification
 3. A Next.js website focused on forum-based content workflows
 
-## Repositories
-We have THREE repositories! Pls take a look.
-- WebExtension: [JunJin1218/natfanclub-webextension](https://github.com/JunJin1218/natfanclub-webextension)
-- Backend for WebExtension: [JunJin1218/natfanclub-backend](https://github.com/JunJin1218/natfanclub-backend.git)
-- Website repo: [ItsMeOX/Hackomania](https://github.com/ItsMeOX/Hackomania)
-
 ## System Overview
 
 ### 1. AI-Powered Web Extension
