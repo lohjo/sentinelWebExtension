@@ -3,14 +3,17 @@
   import { getStoredAuth, clearStoredAuth } from '../../lib/auth-storage';
   import type { StoredAuth } from '../../lib/auth-storage';
   import { isChatDomain, getChatPlatformFromHostname } from '../../lib/chat-scrapers/types';
-  import { FACTGUARD_API_BASE } from '../../lib/config';
+  import {
+    FACTGUARD_API_BASE,
+    BACKEND_CRAWL_URL,
+    BACKEND_VERIFY_CONTENT_URL,
+    BACKEND_API_KEY_HEADER,
+    BACKEND_API_KEY_VALUE,
+    CACHE_TTL_MS,
+  } from '../../lib/config';
   import Login from './Login.svelte';
   import ChatVerifyPanel from './ChatVerifyPanel.svelte';
 
-  const CRAWL_ENDPOINT =
-    'https://natfanclub-backend-809989871890.asia-southeast1.run.app/crawl';
-  const VERIFY_CONTENT_ENDPOINT =
-    'https://natfanclub-backend-809989871890.asia-southeast1.run.app/verify_content';
   const CACHE_STORAGE_KEY = 'verify-cache-v2';
   const PREFERRED_LANGUAGE_STORAGE_KEY = 'preferred-language';
 
@@ -29,7 +32,7 @@
     Analysis: string;
     MissingContext: string[];
     PotentialRisks: string[];
-    fetchedAt: string;
+    fetchedAt: string; // ISO timestamp
   };
 
   type VerifySourceItem = {
@@ -93,16 +96,13 @@
 
   const extractSummary = (payload: unknown) => {
     if (!payload || typeof payload !== 'object') return '';
-
     const record = payload as {
       Summary?: unknown;
       contents?: { Summary?: unknown };
       content?: { Summary?: unknown };
     };
-
     const candidate =
       record.contents?.Summary ?? record.content?.Summary ?? record.Summary ?? '';
-
     return typeof candidate === 'string' ? candidate : '';
   };
 
@@ -110,20 +110,13 @@
     if (!payload || typeof payload !== 'object') {
       return { title: '', body: '', comments: '' };
     }
-
     const record = payload as {
       Title?: unknown;
       'Body Text'?: unknown;
       Comments?: unknown;
-      contents?: {
-        Title?: unknown;
-        'Body Text'?: unknown;
-        Comments?: unknown;
-      };
+      contents?: { Title?: unknown; 'Body Text'?: unknown; Comments?: unknown };
     };
-
     const source = record.contents ?? record;
-
     return {
       title: typeof source.Title === 'string' ? source.Title : '',
       body: typeof source['Body Text'] === 'string' ? source['Body Text'] : '',
@@ -148,11 +141,9 @@
 
   const extractSourceItems = (value: unknown): VerifySourceItem[] => {
     if (!Array.isArray(value)) return [];
-
     return value.flatMap((item) => {
       if (!item || typeof item !== 'object') return [];
       const record = item as { Name?: unknown; URL?: unknown; Note?: unknown };
-
       return [
         {
           Name: typeof record.Name === 'string' ? record.Name : '',
@@ -170,79 +161,53 @@
 
   const parseTextWithBareUrls = (text: string): RichTextSegment[] => {
     if (!text) return [];
-
     const segments: RichTextSegment[] = [];
     const urlRegex = /https?:\/\/[^\s)]+/g;
     let lastIndex = 0;
-
     for (const match of text.matchAll(urlRegex)) {
       const matchText = match[0];
       const start = match.index ?? 0;
-
       if (start > lastIndex) {
         segments.push({ type: 'text', text: text.slice(lastIndex, start) });
       }
-
       const href = matchText.replace(/[.,;:!?]+$/, '');
-      segments.push({
-        type: 'link',
-        text: href,
-        href,
-      });
-
+      segments.push({ type: 'link', text: href, href });
       lastIndex = start + matchText.length;
     }
-
     if (lastIndex < text.length) {
       segments.push({ type: 'text', text: text.slice(lastIndex) });
     }
-
     return segments;
   };
 
   const parseRichTextSegments = (text: string): RichTextSegment[] => {
     if (!text) return [];
-
     const segments: RichTextSegment[] = [];
     const markdownLinkRegex = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
     let lastIndex = 0;
-
     for (const match of text.matchAll(markdownLinkRegex)) {
       const matchText = match[0];
       const start = match.index ?? 0;
-
       if (start > lastIndex) {
         segments.push(...parseTextWithBareUrls(text.slice(lastIndex, start)));
       }
-
       const markdownLabel = match[1];
       const markdownUrl = match[2];
-
       if (markdownLabel && markdownUrl) {
-        segments.push({
-          type: 'link',
-          text: markdownLabel,
-          href: markdownUrl,
-        });
+        segments.push({ type: 'link', text: markdownLabel, href: markdownUrl });
       }
-
       lastIndex = start + matchText.length;
     }
-
     if (lastIndex < text.length) {
       segments.push(...parseTextWithBareUrls(text.slice(lastIndex)));
     }
-
     return segments;
   };
 
   const renderableTextFields = (text: string) => parseRichTextSegments(text);
 
   const extractVerifyDetails = (payload: unknown) => {
-    if (!payload || typeof payload !== 'object') {
-      return emptyVerifyDetails();
-    }
-
+    if (!payload || typeof payload !== 'object') return emptyVerifyDetails();
     const record = payload as {
       CredibilityAssessment?: {
         Verdict?: unknown;
@@ -263,7 +228,6 @@
         PotentialRisks?: unknown;
       };
     };
-
     return {
       verdict:
         typeof record.CredibilityAssessment?.Verdict === 'string'
@@ -300,7 +264,9 @@
       agreements: extractStringList(record.DeepComparison?.Agreements),
       differences: extractStringList(record.DeepComparison?.Differences),
       analysis:
-        typeof record.DeepComparison?.Analysis === 'string' ? record.DeepComparison.Analysis : '',
+        typeof record.DeepComparison?.Analysis === 'string'
+          ? record.DeepComparison.Analysis
+          : '',
       missingContext: extractStringList(record.ContextualFlags?.MissingContext),
       potentialRisks: extractStringList(record.ContextualFlags?.PotentialRisks),
     };
@@ -308,37 +274,17 @@
 
   const getVerificationStatus = (currentVerdict: string) => {
     if (isLoading) return 'Verifying...';
-
-    if (currentVerdict === 'Likely accurate') {
-      return 'Verified!';
-    }
-
-    if (currentVerdict === 'Unverified') {
-      return 'Unverified';
-    }
-
-    if (currentVerdict === 'Potentially misleading') {
-      return 'Misleading';
-    }
-
+    if (currentVerdict === 'Likely accurate') return 'Verified!';
+    if (currentVerdict === 'Unverified') return 'Unverified';
+    if (currentVerdict === 'Potentially misleading') return 'Misleading';
     return hasFetched ? 'Unverified' : 'Waiting';
   };
 
   const getVerificationTone = (currentVerdict: string) => {
     if (isLoading) return 'pending';
-
-    if (currentVerdict === 'Likely accurate') {
-      return 'verified';
-    }
-
-    if (currentVerdict === 'Unverified') {
-      return 'unverified';
-    }
-
-    if (currentVerdict === 'Potentially misleading') {
-      return 'misleading';
-    }
-
+    if (currentVerdict === 'Likely accurate') return 'verified';
+    if (currentVerdict === 'Unverified') return 'unverified';
+    if (currentVerdict === 'Potentially misleading') return 'misleading';
     return hasFetched ? 'unverified' : 'idle';
   };
 
@@ -347,34 +293,59 @@
   const isLanguageOption = (value: string): value is (typeof languageOptions)[number] =>
     languageOptions.includes(value as (typeof languageOptions)[number]);
 
-  const getCachedVerifyEntry = async (cacheKey: string) => {
+  /** Returns null if entry missing OR stale (>24h). Evicts stale entry. */
+  const getCachedVerifyEntry = async (cacheKey: string): Promise<CachedVerifyEntry | null> => {
     const stored = (await browser.storage.local.get(CACHE_STORAGE_KEY)) as {
       [CACHE_STORAGE_KEY]?: Record<string, CachedVerifyEntry>;
     };
+    const entry = stored[CACHE_STORAGE_KEY]?.[cacheKey] ?? null;
+    if (!entry) return null;
 
-    return stored[CACHE_STORAGE_KEY]?.[cacheKey] ?? null;
+    // 24h TTL enforcement
+    if (!entry.fetchedAt || typeof entry.fetchedAt !== 'string') {
+      // Missing timestamp → treat as stale, evict
+      await evictCacheEntry(cacheKey, stored[CACHE_STORAGE_KEY] ?? {});
+      return null;
+    }
+    const fetchedAt = new Date(entry.fetchedAt).getTime();
+    if (isNaN(fetchedAt) || Date.now() - fetchedAt > CACHE_TTL_MS) {
+      await evictCacheEntry(cacheKey, stored[CACHE_STORAGE_KEY] ?? {});
+      return null;
+    }
+
+    return entry;
+  };
+
+  const evictCacheEntry = async (
+    cacheKey: string,
+    currentCache: Record<string, CachedVerifyEntry>,
+  ) => {
+    const nextCache = { ...currentCache };
+    delete nextCache[cacheKey];
+    await browser.storage.local.set({ [CACHE_STORAGE_KEY]: nextCache });
   };
 
   const setCachedVerifyEntry = async (cacheKey: string, entry: CachedVerifyEntry) => {
     const stored = (await browser.storage.local.get(CACHE_STORAGE_KEY)) as {
       [CACHE_STORAGE_KEY]?: Record<string, CachedVerifyEntry>;
     };
-
     const nextCache = {
       ...(stored[CACHE_STORAGE_KEY] ?? {}),
       [cacheKey]: entry,
     };
-
-    await browser.storage.local.set({
-      [CACHE_STORAGE_KEY]: nextCache,
-    });
+    await browser.storage.local.set({ [CACHE_STORAGE_KEY]: nextCache });
   };
+
+  function buildBackendHeaders(): Record<string, string> {
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (BACKEND_API_KEY_VALUE) h[BACKEND_API_KEY_HEADER] = BACKEND_API_KEY_VALUE;
+    return h;
+  }
 
   async function loadPreferredLanguage() {
     const stored = (await browser.storage.local.get(PREFERRED_LANGUAGE_STORAGE_KEY)) as {
       [PREFERRED_LANGUAGE_STORAGE_KEY]?: string;
     };
-
     const storedLanguage = stored[PREFERRED_LANGUAGE_STORAGE_KEY];
     if (storedLanguage && isLanguageOption(storedLanguage)) {
       selectedLanguage = storedLanguage;
@@ -389,24 +360,27 @@
 
   async function loadCurrentTabUrl() {
     try {
-      const fromBackground = await browser.runtime.sendMessage({
+      const fromBackground = (await browser.runtime.sendMessage({
         type: 'get-active-tab-info',
-      }) as { url?: string; tabId?: number } | undefined;
+      })) as { url?: string; tabId?: number } | undefined;
       if (fromBackground?.url != null && fromBackground.url !== '') {
         currentUrl = fromBackground.url;
         currentTabId = fromBackground.tabId;
       } else {
-        const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+        const [tab] = await browser.tabs.query({
+          active: true,
+          lastFocusedWindow: true,
+        });
         currentUrl = tab?.url ?? '';
         currentTabId = tab?.id;
       }
       if (!currentUrl) {
-        throw new Error('현재 탭 URL을 읽지 못했습니다.');
+        throw new Error('Could not read current tab URL.');
       }
     } catch (err) {
       currentUrl = '';
       currentTabId = undefined;
-      error = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
+      error = err instanceof Error ? err.message : 'Unknown error getting tab URL.';
     } finally {
       tabUrlLoaded = true;
     }
@@ -444,11 +418,11 @@
         return;
       }
 
-      const crawlResponse = await fetch(CRAWL_ENDPOINT, {
+      const headers = buildBackendHeaders();
+
+      const crawlResponse = await fetch(BACKEND_CRAWL_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ url: currentUrl, language: selectedLanguage }),
       });
 
@@ -461,11 +435,9 @@
       summary = crawled.body || extractSummary(crawledPayload);
       summarySource = 'network';
 
-      const verifyContentResponse = await fetch(VERIFY_CONTENT_ENDPOINT, {
+      const verifyContentResponse = await fetch(BACKEND_VERIFY_CONTENT_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({
           title: crawled.title,
           body: crawled.body,
@@ -525,7 +497,7 @@
       missingContext = [];
       potentialRisks = [];
       summarySource = '';
-      error = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
+      error = err instanceof Error ? err.message : 'Unknown error during verification.';
     } finally {
       isLoading = false;
     }
@@ -533,9 +505,7 @@
 
   async function handleLanguageChange() {
     await savePreferredLanguage();
-
     if (!currentUrl) return;
-
     void loadSummary();
   }
 
@@ -587,12 +557,7 @@
           Report to FactGuard website
         </a>
       </div>
-      <button
-        type="button"
-        class="logout-button"
-        onclick={handleLogout}
-        title="Log out"
-      >
+      <button type="button" class="logout-button" onclick={handleLogout} title="Log out">
         Log out
       </button>
     </header>
@@ -640,7 +605,6 @@
                 <p class="status-text">{getVerificationStatus(verdict)}</p>
               </div>
             </div>
-
             <label class="language-card">
               <span class="language-label">Language</span>
               <select
@@ -879,13 +843,6 @@
     color: #61584b;
   }
 
-  .header-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
   .user-email {
     font-size: 12px;
     color: #61584b;
@@ -917,14 +874,10 @@
     min-height: 640px;
     padding: 24px 22px 18px;
     background: #ffffff;
-    transition:
-      background-color 2s ease,
-      box-shadow 2s ease;
+    transition: background-color 2s ease, box-shadow 2s ease;
   }
 
-  .popup-main-inner {
-    width: 100%;
-  }
+  .popup-main-inner { width: 100%; }
 
   .popup-header {
     display: flex;
@@ -947,9 +900,7 @@
     text-decoration: none;
   }
 
-  .popup-website-link:hover {
-    text-decoration: underline;
-  }
+  .popup-website-link:hover { text-decoration: underline; }
 
   .popup-tabs {
     display: flex;
@@ -974,7 +925,6 @@
   .popup-tab.tab-active {
     color: #374151;
     border-bottom-color: #4f46e5;
-    cursor: default;
   }
 
   .popup-tab.tab-inactive {
@@ -983,18 +933,14 @@
     pointer-events: none;
   }
 
-  .tab-panel {
-    transition: opacity 0.2s ease, filter 0.2s ease;
-  }
+  .tab-panel { transition: opacity 0.2s ease, filter 0.2s ease; }
 
   .popup-shell.app-tone-verified {
     background: #d8ead8;
     box-shadow: inset 0 0 80px rgba(76, 175, 80, 0.12);
   }
 
-  .popup-shell.app-tone-neutral {
-    background: #ffffff;
-  }
+  .popup-shell.app-tone-neutral { background: #ffffff; }
 
   .popup-shell.app-tone-unverified {
     background: #ead8c4;
@@ -1006,10 +952,7 @@
     box-shadow: inset 0 0 80px rgba(239, 68, 68, 0.14);
   }
 
-  .hero-card {
-    display: block;
-    margin-bottom: 22px;
-  }
+  .hero-card { display: block; margin-bottom: 22px; }
 
   .chat-verify-hero {
     margin-bottom: 20px;
@@ -1036,14 +979,6 @@
     color: #3730a3;
   }
 
-  .chat-verify-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 8px;
-  }
-
   .status-strip,
   .panel {
     background: #f7f5f2;
@@ -1059,11 +994,7 @@
     border-style: solid;
     border-color: rgba(79, 72, 61, 0.12);
     background: #f7f5f2;
-    transition:
-      background-color 2s ease,
-      border-color 2s ease,
-      transform 2s ease,
-      box-shadow 2s ease;
+    transition: background-color 2s ease, border-color 2s ease, transform 2s ease, box-shadow 2s ease;
   }
 
   .status-header {
@@ -1073,44 +1004,27 @@
     gap: 16px;
   }
 
-  .status-row {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-width: 0;
-  }
-
-  .status-copy {
-    min-width: 0;
-  }
+  .status-row { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .status-copy { min-width: 0; }
 
   .status-strip.tone-verified {
     border-color: rgba(47, 125, 50, 0.7);
     background: #e7f6e8;
-    box-shadow:
-      0 2px 0 rgba(255, 255, 255, 0.35) inset,
-      0 0 24px rgba(76, 175, 80, 0.38),
-      0 0 48px rgba(76, 175, 80, 0.18);
+    box-shadow: 0 2px 0 rgba(255,255,255,0.35) inset, 0 0 24px rgba(76,175,80,0.38), 0 0 48px rgba(76,175,80,0.18);
     transform: translateY(-1px);
   }
 
   .status-strip.tone-unverified {
     border-color: rgba(191, 113, 20, 0.7);
     background: #fff1dc;
-    box-shadow:
-      0 2px 0 rgba(255, 255, 255, 0.35) inset,
-      0 0 24px rgba(245, 158, 11, 0.36),
-      0 0 48px rgba(245, 158, 11, 0.18);
+    box-shadow: 0 2px 0 rgba(255,255,255,0.35) inset, 0 0 24px rgba(245,158,11,0.36), 0 0 48px rgba(245,158,11,0.18);
     transform: translateY(-1px);
   }
 
   .status-strip.tone-misleading {
     border-color: rgba(172, 43, 43, 0.72);
     background: #fde8e7;
-    box-shadow:
-      0 2px 0 rgba(255, 255, 255, 0.35) inset,
-      0 0 24px rgba(239, 68, 68, 0.38),
-      0 0 48px rgba(239, 68, 68, 0.18);
+    box-shadow: 0 2px 0 rgba(255,255,255,0.35) inset, 0 0 24px rgba(239,68,68,0.38), 0 0 48px rgba(239,68,68,0.18);
     transform: translateY(-1px);
   }
 
@@ -1121,9 +1035,9 @@
     min-width: 124px;
     padding: 10px 12px 12px;
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.62);
-    border: 1px solid rgba(79, 72, 61, 0.12);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    background: rgba(255,255,255,0.62);
+    border: 1px solid rgba(79,72,61,0.12);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
   }
 
   .language-label {
@@ -1137,24 +1051,18 @@
 
   .language-select {
     width: 100%;
-    border: 1px solid rgba(79, 72, 61, 0.18);
+    border: 1px solid rgba(79,72,61,0.18);
     background: #ffffff;
     color: #1b1b1b;
     padding: 10px 12px;
     font-size: 13px;
     border-radius: 999px;
-    box-shadow: 0 1px 2px rgba(33, 24, 13, 0.06);
+    box-shadow: 0 1px 2px rgba(33,24,13,0.06);
   }
 
-  .language-select:focus {
-    outline: none;
-    border-color: rgba(79, 72, 61, 0.35);
-  }
+  .language-select:focus { outline: none; border-color: rgba(79,72,61,0.35); }
 
-  .panel {
-    margin-bottom: 22px;
-    padding: 20px 18px;
-  }
+  .panel { margin-bottom: 22px; padding: 20px 18px; }
 
   .section-label {
     margin: 0 0 12px;
@@ -1173,63 +1081,33 @@
     letter-spacing: -0.02em;
   }
 
-  .body-copy {
-    margin: 0;
-    font-size: 15px;
-    line-height: 1.6;
-  }
-
-  .muted {
-    color: #756d61;
-  }
-
-  .error-copy {
-    color: #9f1d1d;
-  }
-
-  .source-note {
-    margin: 12px 0 0;
-    font-size: 12px;
-    letter-spacing: 0.03em;
-  }
+  .body-copy { margin: 0; font-size: 15px; line-height: 1.6; }
+  .muted { color: #756d61; }
+  .error-copy { color: #9f1d1d; }
+  .source-note { margin: 12px 0 0; font-size: 12px; letter-spacing: 0.03em; }
 
   .stats-grid,
   .source-columns,
   .comparison-grid,
-  .detail-stack {
-    display: grid;
-    gap: 12px;
-  }
+  .detail-stack { display: grid; gap: 12px; }
 
   .stats-grid,
   .source-columns,
-  .comparison-grid {
-    grid-template-columns: 1fr 1fr;
-  }
+  .comparison-grid { grid-template-columns: 1fr 1fr; }
 
-  .detail-stack {
-    grid-template-columns: 1fr;
-  }
-
-  .stats-grid {
-    margin-top: 16px;
-  }
+  .detail-stack { grid-template-columns: 1fr; }
+  .stats-grid { margin-top: 16px; }
 
   .stat-box,
   .source-card,
   .comparison-column {
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(79, 72, 61, 0.12);
+    background: rgba(255,255,255,0.55);
+    border: 1px solid rgba(79,72,61,0.12);
     border-radius: 12px;
     padding: 14px;
   }
 
-  .stat-number {
-    display: block;
-    font-size: 28px;
-    font-weight: 700;
-    line-height: 1;
-  }
+  .stat-number { display: block; font-size: 28px; font-weight: 700; line-height: 1; }
 
   .stat-label,
   .mini-label {
@@ -1243,9 +1121,7 @@
 
   .source-columns,
   .comparison-grid,
-  .detail-stack {
-    margin-top: 16px;
-  }
+  .detail-stack { margin-top: 16px; }
 
   .source-link {
     display: inline-block;
@@ -1279,8 +1155,5 @@
     color: #3d372e;
   }
 
-  .list li + li {
-    margin-top: 6px;
-  }
-
+  .list li + li { margin-top: 6px; }
 </style>

@@ -24,12 +24,20 @@ export default defineContentScript({
       'Likely Accurate:false': browser.runtime.getURL('/verification_icon/Accurate-NonSG.svg'),
       'Unverified:true': browser.runtime.getURL('/verification_icon/Unverified-SG.svg'),
       'Unverified:false': browser.runtime.getURL('/verification_icon/Unverified-NonSG.svg'),
-      'Potentially Misleading:true': browser.runtime.getURL('/verification_icon/Misleading-SG.svg'),
-      'Potentially Misleading:false': browser.runtime.getURL('/verification_icon/Misleading-NonSG.svg'),
+      'Potentially Misleading:true': browser.runtime.getURL(
+        '/verification_icon/Misleading-SG.svg',
+      ),
+      'Potentially Misleading:false': browser.runtime.getURL(
+        '/verification_icon/Misleading-NonSG.svg',
+      ),
     } as const;
+
     const verifyStateByUrl = new Map<string, VerifyState>();
     let injectTimeout: number | null = null;
     let readyToVerify = false;
+
+    // Track URLs from newly added DOM nodes to prioritize them.
+    const pendingPriorityUrls = new Set<string>();
 
     window.setTimeout(() => {
       readyToVerify = true;
@@ -57,7 +65,11 @@ export default defineContentScript({
       verifyLine.style.display = '';
     };
 
-    const showImageBadge = (badge: HTMLElement, badgeIcon: HTMLImageElement, imageUrl: string) => {
+    const showImageBadge = (
+      badge: HTMLElement,
+      badgeIcon: HTMLImageElement,
+      imageUrl: string,
+    ) => {
       badge.style.display = 'inline-block';
       badge.style.marginLeft = '6px';
       badge.style.padding = '0';
@@ -172,11 +184,13 @@ export default defineContentScript({
       verifyLine.style.color = '#b91c1c';
     };
 
-    const scheduleInject = () => {
+    const scheduleInject = (priorityUrls?: Set<string>) => {
+      if (priorityUrls) {
+        for (const u of priorityUrls) pendingPriorityUrls.add(u);
+      }
       if (injectTimeout !== null) {
         window.clearTimeout(injectTimeout);
       }
-
       injectTimeout = window.setTimeout(() => {
         injectTimeout = null;
         injectDomainBadge();
@@ -201,11 +215,65 @@ export default defineContentScript({
         });
     };
 
+    /** Collect result-card URLs from a list of DOM nodes (for mutation prioritization). */
+    function extractUrlsFromNodes(nodes: NodeList): Set<string> {
+      const urls = new Set<string>();
+      for (const node of nodes) {
+        if (!(node instanceof HTMLElement)) continue;
+        const cites = node.querySelectorAll<HTMLElement>('cite');
+        if (!cites.length && node.tagName === 'CITE') cites.length; // handled below
+
+        const allCites =
+          cites.length > 0
+            ? Array.from(cites)
+            : node.tagName === 'CITE'
+              ? [node]
+              : [];
+
+        for (const cite of allCites) {
+          const resultCard =
+            cite.closest<HTMLElement>('div.MjjYud, div.g, div[data-hveid]') ??
+            cite.parentElement;
+          if (!resultCard) continue;
+          const heading = resultCard.querySelector<HTMLHeadingElement>('h3');
+          if (!heading) continue;
+          const anchor =
+            heading.closest<HTMLAnchorElement>('a[href]') ??
+            resultCard.querySelector<HTMLAnchorElement>('a[href]');
+          if (anchor?.href) urls.add(anchor.href);
+        }
+      }
+      return urls;
+    }
+
     function injectDomainBadge() {
       const processedCards = new Set<HTMLElement>();
       const cites = document.querySelectorAll<HTMLElement>('#search cite');
 
-      for (const cite of cites) {
+      // Sort: newly added (priority) cards come first to get badge + verification sooner.
+      const sortedCites = Array.from(cites).sort((a, b) => {
+        const aCard =
+          a.closest<HTMLElement>('div.MjjYud, div.g, div[data-hveid]') ?? a.parentElement;
+        const bCard =
+          b.closest<HTMLElement>('div.MjjYud, div.g, div[data-hveid]') ?? b.parentElement;
+        const aUrl =
+          (
+            aCard?.querySelector<HTMLAnchorElement>('h3')?.closest<HTMLAnchorElement>('a[href]') ??
+            aCard?.querySelector<HTMLAnchorElement>('a[href]')
+          )?.href ?? '';
+        const bUrl =
+          (
+            bCard?.querySelector<HTMLAnchorElement>('h3')?.closest<HTMLAnchorElement>('a[href]') ??
+            bCard?.querySelector<HTMLAnchorElement>('a[href]')
+          )?.href ?? '';
+        const aPriority = pendingPriorityUrls.has(aUrl) ? -1 : 0;
+        const bPriority = pendingPriorityUrls.has(bUrl) ? -1 : 0;
+        return aPriority - bPriority;
+      });
+
+      pendingPriorityUrls.clear();
+
+      for (const cite of sortedCites) {
         const resultCard =
           cite.closest<HTMLElement>('div.MjjYud, div.g, div[data-hveid]') ?? cite.parentElement;
         if (!resultCard || processedCards.has(resultCard)) continue;
@@ -268,8 +336,22 @@ export default defineContentScript({
 
     injectDomainBadge();
 
-    const observer = new MutationObserver(() => {
-      scheduleInject();
+    const observer = new MutationObserver((mutations) => {
+      // Collect only newly added nodes to prioritize them.
+      const addedNodes: Node[] = [];
+      for (const m of mutations) {
+        if (m.addedNodes.length > 0) {
+          addedNodes.push(...Array.from(m.addedNodes));
+        }
+      }
+      if (addedNodes.length > 0) {
+        const priorityUrls = extractUrlsFromNodes(
+          { length: addedNodes.length, [Symbol.iterator]: addedNodes[Symbol.iterator].bind(addedNodes), ...addedNodes } as unknown as NodeList,
+        );
+        scheduleInject(priorityUrls.size > 0 ? priorityUrls : undefined);
+      } else {
+        scheduleInject();
+      }
     });
 
     observer.observe(document.body, {

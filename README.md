@@ -149,6 +149,35 @@ Build for browser loading:
 pnpm build
 ```
 
+### Web Extension (Bring Your Own Key deployment)
+
+For production/self-hosted deployment, inject your own backend shared key at build time.
+
+Required build-time env vars:
+
+- `VITE_BACKEND_API_KEY`: shared secret sent as `X-FactGuard-Key`
+
+Optional build-time env vars:
+
+- `VITE_BACKEND_BASE`: backend base URL (example: `https://your-backend.example.com`)
+- `VITE_FACTGUARD_API_BASE`: web app base URL for login/report links
+
+PowerShell example:
+
+```powershell
+$env:VITE_BACKEND_API_KEY = "your-shared-secret"
+$env:VITE_BACKEND_BASE = "https://your-backend.example.com"
+$env:VITE_FACTGUARD_API_BASE = "https://your-app.example.com"
+pnpm build
+pnpm zip
+```
+
+Notes:
+
+- `VITE_BACKEND_BASE` and `VITE_FACTGUARD_API_BASE` are normalized (trailing slashes removed) before URL composition.
+- Build-time custom origins are added to extension `host_permissions` during build.
+- The shared extension key is best-effort only because browser bundles are inspectable. Keep backend rate limiting enabled.
+
 Then load the generated extension manually in the target browser.
 
 Create packaged zip builds:

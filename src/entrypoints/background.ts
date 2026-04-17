@@ -1,6 +1,10 @@
+import {
+  BACKEND_DOMAIN_VERIFY_URL,
+  BACKEND_API_KEY_HEADER,
+  BACKEND_API_KEY_VALUE,
+} from '../lib/config';
+
 export default defineBackground(() => {
-  const VERIFY_ENDPOINT =
-    'https://natfanclub-backend-809989871890.asia-southeast1.run.app/domain_verify';
   const VERIFY_TIMEOUT_MS = 8000;
 
   let lastActiveTabId: number | undefined = undefined;
@@ -9,10 +13,13 @@ export default defineBackground(() => {
     lastActiveTabId = activeInfo.tabId;
   });
 
-  void browser.tabs.query({ active: true }).then((tabs) => {
-    const t = tabs[0];
-    if (t?.id != null) lastActiveTabId = t.id;
-  });
+  // Seed from current-window active tab only (avoid cross-window mismatch).
+  void browser.tabs
+    .query({ active: true, currentWindow: true })
+    .then((tabs) => {
+      const t = tabs[0];
+      if (t?.id != null) lastActiveTabId = t.id;
+    });
 
   async function getActiveTabInfo(): Promise<{ url: string; tabId: number | undefined }> {
     if (lastActiveTabId != null) {
@@ -26,7 +33,10 @@ export default defineBackground(() => {
     try {
       const win = await browser.windows.getLastFocused({ windowTypes: ['normal'] });
       if (win?.id != null) {
-        const windowTabs = await browser.tabs.query({ active: true, windowId: win.id });
+        const windowTabs = await browser.tabs.query({
+          active: true,
+          windowId: win.id,
+        });
         const activeTab = windowTabs[0];
         if (activeTab?.url) {
           lastActiveTabId = activeTab.id;
@@ -36,7 +46,7 @@ export default defineBackground(() => {
     } catch {
       /* ignore */
     }
-    const anyTabs = await browser.tabs.query({ active: true });
+    const anyTabs = await browser.tabs.query({ active: true, currentWindow: true });
     const anyTab = anyTabs[0];
     if (anyTab?.url) {
       lastActiveTabId = anyTab.id;
@@ -49,12 +59,17 @@ export default defineBackground(() => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), VERIFY_TIMEOUT_MS);
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (BACKEND_API_KEY_VALUE) {
+      headers[BACKEND_API_KEY_HEADER] = BACKEND_API_KEY_VALUE;
+    }
+
     try {
-      const response = await fetch(VERIFY_ENDPOINT, {
+      const response = await fetch(BACKEND_DOMAIN_VERIFY_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ url, language: 'English' }),
         signal: controller.signal,
       });
@@ -93,10 +108,8 @@ export default defineBackground(() => {
         sendResponse(result);
       })
       .catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : 'unknown error';
-        sendResponse({
-          __error: message,
-        });
+        const msg = error instanceof Error ? error.message : 'unknown error';
+        sendResponse({ __error: msg });
       });
 
     return true;
