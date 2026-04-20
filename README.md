@@ -1,4 +1,4 @@
-# FactGuard
+# ContextGuard
 
 AI-assisted credibility review system built across three repositories:
 
