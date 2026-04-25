@@ -2,51 +2,53 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 
-from openai import AsyncOpenAI
+try:
+    from llm import chat_complete
+except ImportError:
+    from src.llm import chat_complete
 
 logger = logging.getLogger(__name__)
 
-WEBSITE_VERIFY_PROMPT_ID = "pmpt_69abe408b3a88193a5a119438d36665102cb49c173fc89a3"
+_SYSTEM = """\
+You are a domain credibility expert. Given a URL, assess the website and return ONLY valid JSON — no markdown.
 
-_api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
-if not _api_key:
-    raise RuntimeError("OPENAI_API_KEY is missing or empty.")
+Output schema:
+{
+  "Verdict": "<Likely Accurate|Unverified|Potentially Misleading>",
+  "IsSingaporeSite": <true|false>,
+  "Fail": false
+}
 
-# Shared async client — reused across all requests.
-_client = AsyncOpenAI(api_key=_api_key)
+IsSingaporeSite is true for Singapore-based news, government, or institutional sites
+(e.g. straitstimes.com, channelnewsasia.com, gov.sg, todayonline.com, mothership.sg)."""
+
+
+def _strip_fences(raw: str) -> str:
+    raw = raw.strip()
+    if raw.startswith("```"):
+        parts = raw.split("```", 2)
+        raw = parts[1] if len(parts) > 1 else raw
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.rsplit("```", 1)[0].strip()
+    return raw
 
 
 async def website_verify_with_openai(url: str) -> dict:
-    response = await _client.responses.create(
-        prompt={
-            "id": WEBSITE_VERIFY_PROMPT_ID,
-            "variables": {"url": url},
-        }
+    raw = await chat_complete(
+        messages=[
+            {"role": "system", "content": _SYSTEM},
+            {"role": "user", "content": f"Assess this URL: {url}"},
+        ],
+        max_tokens=100,
     )
 
-    raw = getattr(response, "output_text", None)
-    if not raw:
-        logger.error("website_verify_with_openai: empty output_text for url=%s", url)
-        raise RuntimeError("OpenAI returned empty output_text for website verify.")
-
+    raw = _strip_fences(raw)
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
         logger.error(
-            "website_verify_with_openai: JSON parse failed for url=%s raw=%s...",
-            url,
-            raw[:200],
+            "website_verify: JSON parse failed url=%s raw=%s...", url, raw[:200]
         )
-        raise RuntimeError(
-            f"Website verify: could not parse OpenAI JSON response: {exc}"
-        ) from exc
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    target_url = "https://example.com"
-    result = asyncio.run(website_verify_with_openai(target_url))
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+        return {"Verdict": "Unverified", "IsSingaporeSite": False, "Fail": True}

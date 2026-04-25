@@ -10,6 +10,7 @@ dependencies = [
     "openai>=1.0.0",
     # CORS + middleware already bundled with starlette (fastapi dep), listed for clarity.
     "starlette>=0.40.0",
-    # HTTP client used by openai SDK
+    # HTTP client used by openai SDK and crawl
     "httpx>=0.27.0",
+    "beautifulsoup4>=4.12.0",
 ]

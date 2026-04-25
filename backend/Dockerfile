@@ -6,7 +6,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml uv.lock ./
-RUN pip install uv && uv sync --frozen --no-dev
+RUN pip install uv && uv sync --no-dev
 
 COPY . .
 ENV PORT=8080

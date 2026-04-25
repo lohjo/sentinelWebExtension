@@ -2,26 +2,51 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import time
-
-from openai import AsyncOpenAI
 
 try:
     from crawl import crawl_with_openai
-except ImportError:  # pragma: no cover
+    from llm import chat_complete
+except ImportError:
     from src.crawl import crawl_with_openai
+    from src.llm import chat_complete
 
 logger = logging.getLogger(__name__)
 
-VERIFY_PROMPT_ID = "pmpt_69abc91051848195800cf59937efd9410593b431d4c0aece"
+_SYSTEM = """\
+You are a professional fact-checker. Analyze the provided content and return ONLY valid JSON — no markdown, no explanation.
 
-_api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
-if not _api_key:
-    raise RuntimeError("OPENAI_API_KEY is missing or empty.")
+Output schema:
+{
+  "CredibilityAssessment": {
+    "Verdict": "<Likely Accurate|Unverified|Potentially Misleading>",
+    "VerdictReasoning": "<one paragraph>",
+    "SupportingSourceCount": <int>,
+    "ContradictingSourceCount": <int>,
+    "SampleSupportingSources": [{"Title": "", "URL": "", "Excerpt": ""}],
+    "SampleContradictingSources": [{"Title": "", "URL": "", "Excerpt": ""}]
+  },
+  "DeepComparison": {
+    "ReliableSource": {"Name": "", "URL": ""},
+    "Agreements": ["<point>"],
+    "Differences": ["<point>"],
+    "Analysis": "<paragraph>"
+  },
+  "ContextualFlags": {
+    "MissingContext": ["<flag>"],
+    "PotentialRisks": ["<flag>"]
+  }
+}"""
 
-# Shared async client — reused across all requests.
-_client = AsyncOpenAI(api_key=_api_key)
+
+def _strip_fences(raw: str) -> str:
+    raw = raw.strip()
+    if raw.startswith("```"):
+        parts = raw.split("```", 2)
+        raw = parts[1] if len(parts) > 1 else raw
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.rsplit("```", 1)[0].strip()
+    return raw
 
 
 async def verify_content_with_openai(
@@ -30,30 +55,27 @@ async def verify_content_with_openai(
     comments: str,
     language: str,
 ) -> dict:
-    response = await _client.responses.create(
-        prompt={
-            "id": VERIFY_PROMPT_ID,
-            "variables": {
-                "title": title,
-                "body": body,
-                "comments": comments,
-                "language": language,
-            },
-        }
+    user_msg = (
+        f"Language: {language}\n"
+        f"Title: {title}\n\n"
+        f"Body:\n{body[:6000]}\n\n"
+        f"Comments:\n{comments[:2000]}"
     )
 
-    raw = getattr(response, "output_text", None)
-    if not raw:
-        logger.error("verify_content_with_openai: OpenAI returned empty output_text")
-        raise RuntimeError("OpenAI returned empty output_text for verify.")
+    raw = await chat_complete(
+        messages=[
+            {"role": "system", "content": _SYSTEM},
+            {"role": "user", "content": user_msg},
+        ],
+        max_tokens=2000,
+    )
 
+    raw = _strip_fences(raw)
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
-        logger.error(
-            "verify_content_with_openai: JSON parse failed raw=%s...", raw[:200]
-        )
-        raise RuntimeError(f"Verify: could not parse OpenAI JSON response: {exc}") from exc
+        logger.error("verify_content: JSON parse failed raw=%s...", raw[:200])
+        raise RuntimeError(f"Verify: could not parse LLM JSON response: {exc}") from exc
 
 
 async def verify_url_with_openai(url: str) -> dict:
@@ -64,14 +86,3 @@ async def verify_url_with_openai(url: str) -> dict:
         comments=crawled.get("Comments", ""),
         language="English",
     )
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    target_url = "https://www.reddit.com/r/singapore/comments/1rfqh4z/"
-    started = time.perf_counter()
-    result = asyncio.run(verify_url_with_openai(target_url))
-    elapsed = time.perf_counter() - started
-    print(json.dumps(result, ensure_ascii=False, indent=2))
-    print(f"elapsed: {elapsed:.2f}s")

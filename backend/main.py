@@ -129,9 +129,9 @@ class ContentVerifyRequest(BaseModel):
 def _openai_error_to_http(exc: Exception) -> HTTPException:
     msg = str(exc)
     if "invalid_api_key" in msg or "authentication" in msg.lower():
-        return HTTPException(status_code=502, detail={"error": "Backend OpenAI auth error"})
+        return HTTPException(status_code=502, detail={"error": "Backend SEA-LION auth error"})
     if "rate_limit" in msg or "429" in msg:
-        return HTTPException(status_code=503, detail={"error": "OpenAI rate limit reached; try later"})
+        return HTTPException(status_code=503, detail={"error": "SEA-LION rate limit reached; try later"})
     return HTTPException(status_code=500, detail={"error": "Upstream processing error", "detail": msg})
 
 

@@ -1,0 +1,61 @@
+Summary of changes:
+
+  - cloudbuild.yaml — added groq-api-key-2 to secretEnv, availableSecrets, and --set-env-vars as
+  GROQ_API_KEY
+  - backend/src/llm.py — new shared module: tries SEA-LION first, catches any exception, falls back to
+   Groq (llama-3.3-70b-versatile)
+  - verify.py + website_verify.py — now use chat_complete() from llm.py instead of direct client calls
+
+  Fallback is transparent — if SEA-LION is down/rate-limited/returns error, Groq handles it silently.
+
+✻ Cogitated for 52s
+
+❯ Summarise all progress done in this session using ful caveman format.
+
+● Session Progress
+
+  Goal: Swap backend to self-hosted GCP, switch models to SEA-LION/SEA-Guard, launch production.
+
+  ---
+  Backend Model Swap (SEA-LION + Groq fallback)
+
+  Old: 3 files used openai.responses.create with stored prompt IDs. No web crawling — OpenAI did it.
+
+  New architecture:
+  - src/llm.py — shared client. Tries SEA-LION (https://api.sea-lion.ai/v1) first. Any failure → falls
+   back to Groq (llama-3.3-70b-versatile via https://api.groq.com/openai/v1). Both use
+  OpenAI-compatible SDK.
+  - src/crawl.py — real HTTP crawl via httpx + BeautifulSoup. Extracts title, body, comments from DOM.
+   No LLM needed for fetch step.
+  - src/verify.py — calls chat_complete(), parses JSON verdict with full CredibilityAssessment /
+  DeepComparison / ContextualFlags schema.
+  - src/website_verify.py — calls chat_complete(), returns { Verdict, IsSingaporeSite, Fail }. Safe
+  JSON fallback on parse error.
+
+  Env vars backend reads: SEA_LION_API_KEY, GROQ_API_KEY, FACTGUARD_API_KEY.
+
+  ---
+  Dependency + Dockerfile Fixes
+
+  - pyproject.toml — added beautifulsoup4>=4.12.0
+  - Dockerfile — dropped --frozen flag from uv sync so new dep resolves at build time
+
+  ---
+  Cloud Build Pipeline
+
+  cloudbuild.yaml (new file at repo root):
+  - Step 1: Docker build ./backend → tags :$COMMIT_SHA + :latest
+  - Step 2: Push both tags to asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/factguard-backend
+  - Step 3: gcloud run deploy with correct --set-env-vars syntax (was the root cause of original
+  failure)
+  - Secrets pulled from Secret Manager: sealion-api-key, factguard-api-key, gemini-api-key,
+  groq-api-key-2
+  - env: names in availableSecrets match secretEnv list exactly (was mismatched before fix)
+
+  ---
+  Remaining Manual Steps
+
+  1. Grant Cloud Build SA IAM roles (artifactregistry.writer, run.admin, iam.serviceAccountUser)
+  2. Create Artifact Registry repo backend in asia-southeast1
+  3. gcloud builds submit --project=slushies --config=cloudbuild.yaml .
+  4. Get Cloud Run URL → update VITE_BACKEND_BASE in .env → pnpm build
