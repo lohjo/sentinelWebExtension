@@ -1,0 +1,32 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.titleSection {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 18px;
+}
+
+.title {
+  color: #333333;
+  font-weight: 600;
+}
+
+.inputSection {
+  width: 100%;
+}
+
+.inputSection textarea {
+  width: 100%;
+  padding: 10px 20px;
+  border-radius: 5px;
+  border: 1px solid #cccccc;
+}
+
+.inputSection textarea:focus {
+  outline: 2px solid #a6b5f9;
+}

@@ -1,0 +1,86 @@
+.container {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 60px;
+  padding: 10px;
+}
+
+.box {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 1200px;
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  height: 100%;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.pageNavs {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  margin-left: auto;
+}
+
+.sepLine {
+  width: 1px;
+  height: 100%;
+  background-color: #e5e7eb;
+  margin-inline: 30px;
+}
+
+.authLinks {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.loginLink {
+  font-size: 16px;
+  font-weight: 500;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.loginLink:hover {
+  text-decoration: underline;
+}
+
+.button {
+  background-color: #3c5ae1;
+  color: white;
+  padding: 6px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.button:hover {
+  background-color: #2346e3;
+}
+
+.button a {
+  color: white;
+}
+
+.profileLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+  color: #3c3d5e;
+  border-radius: 8px;
+}
+
+.profileLink:hover {
+  background-color: #e5e7eb;
+  color: #3c5ae1;
+}

@@ -1,0 +1,27 @@
+{
+  "shared": {
+    "userAgent": "Mozilla/5.0 (compatible; HackomaniaBot/1.0; +https://hackomania.example.com)",
+    "maxContentLength": 10000
+  },
+  "default": {
+    "timeoutMs": 10000,
+    "stripElements": "script, style, nav, footer, header, iframe, noscript",
+    "contentSelectors": "article, main, [role='main']"
+  },
+  "tiktok": {
+    "oembedUrl": "https://www.tiktok.com/oembed"
+  },
+  "x": {
+    "syndicationUrl": "https://cdn.syndication.twimg.com/tweet-result",
+    "titleMaxLength": 100
+  },
+  "facebook": {
+    "oembedUrl": "https://www.facebook.com/plugins/post/oembed.json"
+  },
+  "reddit": {
+    "baseUrl": "https://www.reddit.com"
+  },
+  "instagram": {
+    "oembedUrl": "https://graph.facebook.com/v22.0/instagram_oembed"
+  }
+}

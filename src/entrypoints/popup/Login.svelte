@@ -2,11 +2,11 @@
   import { loginWithEmailAndPassword } from '../../lib/hackomania-api';
   import { setStoredAuth } from '../../lib/auth-storage';
   import type { StoredAuthUser } from '../../lib/auth-storage';
-  import { FACTGUARD_API_BASE } from '../../lib/config';
+  import { CONTEXTGUARD_API_BASE } from '../../lib/config';
 
   const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const MIN_PASSWORD_LENGTH = 1;
-  const REGISTER_URL = `${FACTGUARD_API_BASE}/auth/register`;
+  const REGISTER_URL = `${CONTEXTGUARD_API_BASE}/auth/register`;
 
   export let onLoginSuccess: (user: StoredAuthUser) => void = () => {};
 
@@ -56,7 +56,7 @@
 
 <main class="login-shell">
   <section class="login-card">
-    <h1 class="login-title">Log in to FactGuard</h1>
+    <h1 class="login-title">Log in to ContextGuard</h1>
     <p class="login-subtitle">Sign in with your account to use the extension.</p>
 
     <form class="login-form" onsubmit={handleSubmit}>

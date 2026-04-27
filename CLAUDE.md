@@ -27,7 +27,7 @@ Copy `.env.example` to `.env` before dev/build. Key vars:
 |---|---|---|
 | `VITE_BACKEND_API_KEY` | Yes | Auth header injected by background.ts |
 | `VITE_BACKEND_BASE` | No | Override backend URL |
-| `VITE_FACTGUARD_API_BASE` | No | Override web app URL |
+| `VITE_CONTEXTGUARD_API_BASE` | No | Override web app URL |
 
 Host permissions in `wxt.config.ts` are derived from these env vars at build time.
 
@@ -39,7 +39,7 @@ Build outputs to `.output/chrome-mv3/` (prod) and `.output/chrome-mv3-dev/` (dev
 
 ### Entrypoints (`src/entrypoints/`)
 
-- **background.ts** — Service worker. Tracks active tab via `browser.tabs` events. Relays `get-active-tab-info` and `verify-url` messages between popup and content scripts. Injects `X-FactGuard-Key` auth header on matching backend requests using `declarativeNetRequest`-style fetch interception.
+- **background.ts** — Service worker. Tracks active tab via `browser.tabs` events. Relays `get-active-tab-info` and `verify-url` messages between popup and content scripts. Injects `X-ContextGuard-Key` auth header on matching backend requests using `declarativeNetRequest`-style fetch interception.
 
 - **content.ts** — Injected on Google Search. Uses `MutationObserver` to detect new result cards, appends verification badges, then fires domain verify requests (8s AbortController timeout) against the backend. Badge state cycles: `verifying…` → verdict icon (Accurate/Unverified/Misleading, SG vs Non-SG variants from `public/verification_icon/`).
 

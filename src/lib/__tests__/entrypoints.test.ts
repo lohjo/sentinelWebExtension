@@ -55,9 +55,9 @@ describe('cache TTL enforcement', () => {
 // Config constants sanity checks
 // ---------------------------------------------------------------------------
 describe('config constants', () => {
-  it('FACTGUARD_API_BASE has no trailing slash', async () => {
-    const { FACTGUARD_API_BASE } = await import('../config');
-    expect(FACTGUARD_API_BASE).not.toMatch(/\/$/);
+  it('CONTEXTGUARD_API_BASE has no trailing slash', async () => {
+    const { CONTEXTGUARD_API_BASE } = await import('../config');
+    expect(CONTEXTGUARD_API_BASE).not.toMatch(/\/$/);
   });
 
   it('BACKEND_BASE has no trailing slash', async () => {
@@ -108,10 +108,10 @@ describe('env-driven config', () => {
     expect(BACKEND_DOMAIN_VERIFY_URL).toBe('https://example-backend.test/domain_verify');
   });
 
-  it('normalizes VITE_FACTGUARD_API_BASE with trailing slash', async () => {
-    vi.stubEnv('VITE_FACTGUARD_API_BASE', 'https://custom-app.example///');
-    const { FACTGUARD_API_BASE } = await import('../config');
-    expect(FACTGUARD_API_BASE).toBe('https://custom-app.example');
+  it('normalizes VITE_CONTEXTGUARD_API_BASE with trailing slash', async () => {
+    vi.stubEnv('VITE_CONTEXTGUARD_API_BASE', 'https://custom-app.example///');
+    const { CONTEXTGUARD_API_BASE } = await import('../config');
+    expect(CONTEXTGUARD_API_BASE).toBe('https://custom-app.example');
   });
 
   it('uses VITE_BACKEND_API_KEY when provided', async () => {

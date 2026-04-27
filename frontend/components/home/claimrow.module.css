@@ -1,0 +1,75 @@
+.container {
+  /* border: 1px solid red; */
+  display: flex;
+  gap: 30px;
+}
+
+.titleSection {
+  width: 30%;
+}
+
+.titleSection > img {
+  width: 100%;
+  height: 200px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  object-fit: cover;
+}
+
+.claimTitle {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.claimMetadata {
+  margin-top: 20px;
+  font-size: 13px;
+  color: #606060;
+}
+
+.postsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.postRow {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.postRow:hover .postTitle {
+  color: rgb(0, 0, 0);
+  text-decoration: underline;
+}
+
+.postRow > .postSrc {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.postSrc > img {
+  width: 16px;
+  height: 16px;
+  aspect-ratio: 1/1;
+}
+
+.postSrc > span {
+  color: #606060;
+}
+
+.postRow > .postTitle {
+  color: #333333;
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.postRow > .postTime {
+  font-size: 14px;
+  color: #606060;
+}

@@ -12,7 +12,16 @@
       "Bash(gcloud artifacts repositories create *)",
       "Bash(git -C /c/Users/User/Projects/GitHub/jwj2026 log --oneline -10)",
       "Bash(git -C /c/Users/User/Projects/GitHub/jwj2026 stash list)",
-      "Read(//c/Users/User/**)"
+      "Read(//c/Users/User/**)",
+      "Bash(gcloud --version)",
+      "Bash(gcloud services *)",
+      "Bash(gcloud secrets *)",
+      "Bash(gcloud run *)",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" https://factguard-backend-477107377254.asia-southeast1.run.app/)",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" https://factguard-backend-477107377254.asia-southeast1.run.app/netcheck)",
+      "Bash(curl -s -w \"\\\\nHTTP %{http_code}\\\\n\" -X POST https://factguard-backend-477107377254.asia-southeast1.run.app/domain_verify -H \"Content-Type: application/json\" -d '{\"url\":\"https://www.bbc.com/\",\"language\":\"English\"}')",
+      "Bash(pnpm test *)",
+      "Bash(pnpm check *)"
     ]
   }
 }

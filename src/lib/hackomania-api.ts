@@ -1,4 +1,8 @@
-import { FACTGUARD_API_BASE, FACTGUARD_LOGIN_PATH, FACTGUARD_CHAT_REPORT_PATH } from './config';
+import {
+  CONTEXTGUARD_API_BASE,
+  CONTEXTGUARD_LOGIN_PATH,
+  CONTEXTGUARD_CHAT_REPORT_PATH,
+} from './config';
 import type { StoredAuthUser } from './auth-storage';
 
 const GENERIC_ERROR_MESSAGE = 'Something went wrong';
@@ -44,7 +48,7 @@ export async function loginWithEmailAndPassword(
   email: string,
   password: string
 ): Promise<LoginResult> {
-  const url = `${FACTGUARD_API_BASE}${FACTGUARD_LOGIN_PATH}`;
+  const url = `${CONTEXTGUARD_API_BASE}${CONTEXTGUARD_LOGIN_PATH}`;
 
   let response: Response;
   try {
@@ -111,7 +115,7 @@ export async function submitChatReport(
     ...(m.timestamp != null && m.timestamp !== '' && { timestamp: m.timestamp }),
   }));
 
-  const url = `${FACTGUARD_API_BASE}${FACTGUARD_CHAT_REPORT_PATH}`;
+  const url = `${CONTEXTGUARD_API_BASE}${CONTEXTGUARD_CHAT_REPORT_PATH}`;
   let response: Response;
   try {
     response = await fetch(url, {

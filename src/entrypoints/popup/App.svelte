@@ -4,7 +4,7 @@
   import type { StoredAuth } from '../../lib/auth-storage';
   import { isChatDomain, getChatPlatformFromHostname } from '../../lib/chat-scrapers/types';
   import {
-    FACTGUARD_API_BASE,
+    CONTEXTGUARD_API_BASE,
     BACKEND_CRAWL_URL,
     BACKEND_VERIFY_CONTENT_URL,
     BACKEND_API_KEY_HEADER,
@@ -550,11 +550,11 @@
         <span class="user-email">{auth.user.email}</span>
         <a
           class="popup-website-link"
-          href={FACTGUARD_API_BASE}
+          href={CONTEXTGUARD_API_BASE}
           target="_blank"
           rel="noopener noreferrer"
         >
-          Report to FactGuard website
+          Report to ContextGuard website
         </a>
       </div>
       <button type="button" class="logout-button" onclick={handleLogout} title="Log out">

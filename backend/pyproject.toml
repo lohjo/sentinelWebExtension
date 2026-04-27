@@ -1,7 +1,7 @@
 [project]
 name = "natfanclub-backend"
 version = "0.2.0"
-description = "FactGuard FastAPI backend — crawl, verify, domain-check."
+description = "ContextGuard FastAPI backend — crawl, verify, domain-check."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

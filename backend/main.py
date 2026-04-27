@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-SHARED_API_KEY: str = (os.getenv("FACTGUARD_API_KEY") or "").strip()
+SHARED_API_KEY: str = (os.getenv("CONTEXTGUARD_API_KEY") or "").strip()
 RATE_LIMIT_REQUESTS: int = int(os.getenv("RATE_LIMIT_REQUESTS", "60"))
 RATE_LIMIT_WINDOW_SEC: int = int(os.getenv("RATE_LIMIT_WINDOW_SEC", "60"))
 
@@ -32,7 +32,7 @@ ALLOWED_ORIGINS: list[str] = [
     origin.strip()
     for origin in os.getenv(
         "CORS_ALLOWED_ORIGINS",
-        "https://hackomania-three.vercel.app,http://localhost:3000",
+        "https://contextguard-frontend-477107377254.asia-southeast1.run.app,http://localhost:3000",
     ).split(",")
     if origin.strip()
 ]
@@ -40,7 +40,7 @@ ALLOWED_ORIGINS: list[str] = [
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
-app = FastAPI(title="FactGuard Backend", version="1.0.0")
+app = FastAPI(title="ContextGuard Backend", version="1.0.0")
 
 # CORS
 app.add_middleware(
@@ -85,7 +85,7 @@ def _check_rate_limit(request: Request) -> None:
 # API-key validation middleware
 # ---------------------------------------------------------------------------
 _SKIP_AUTH_PATHS = {"/", "/netcheck", "/docs", "/openapi.json", "/redoc"}
-_API_KEY_HEADER = "X-FactGuard-Key"
+_API_KEY_HEADER = "X-ContextGuard-Key"
 
 
 @app.middleware("http")
@@ -101,7 +101,7 @@ async def validate_api_key(request: Request, call_next: Any) -> Response:
     if provided != SHARED_API_KEY:
         logger.warning("Rejected request: missing/invalid %s from %s", _API_KEY_HEADER, request.client)
         return Response(
-            content='{"error":"Unauthorized","detail":"Missing or invalid X-FactGuard-Key header"}',
+            content='{"error":"Unauthorized","detail":"Missing or invalid X-ContextGuard-Key header"}',
             status_code=401,
             media_type="application/json",
         )
@@ -140,7 +140,7 @@ def _openai_error_to_http(exc: Exception) -> HTTPException:
 # ---------------------------------------------------------------------------
 @app.get("/")
 def read_root() -> dict[str, str]:
-    return {"message": "FactGuard backend v1"}
+    return {"message": "ContextGuard backend v1"}
 
 
 @app.post("/verify", deprecated=True)

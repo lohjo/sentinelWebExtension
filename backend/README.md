@@ -1,6 +1,6 @@
-# FactGuard Backend
+# ContextGuard Backend
 
-FastAPI backend for the FactGuard browser extension.
+FastAPI backend for the ContextGuard browser extension.
 
 ## Endpoints
 
@@ -23,26 +23,26 @@ Do **not** use it for new code. Use `/crawl` → `/verify_content` instead.
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `OPENAI_API_KEY` | Yes | — | OpenAI API key |
-| `FACTGUARD_API_KEY` | No | *(open)* | Shared secret checked in `X-FactGuard-Key` header. If unset, auth is disabled (dev only). |
+| `CONTEXTGUARD_API_KEY` | No | *(open)* | Shared secret checked in `X-ContextGuard-Key` header. If unset, auth is disabled (dev only). |
 | `CORS_ALLOWED_ORIGINS` | No | see below | Comma-separated allowed origins |
 | `RATE_LIMIT_REQUESTS` | No | `60` | Max requests per IP per window |
 | `RATE_LIMIT_WINDOW_SEC` | No | `60` | Rate-limit window in seconds |
 
-Default CORS origins: `https://hackomania-three.vercel.app, http://localhost:3000`
+Default CORS origins: `https://contextguard-frontend-477107377254.asia-southeast1.run.app, http://localhost:3000`
 
 ## Authentication
 
-All non-health endpoints require the `X-FactGuard-Key` header when `FACTGUARD_API_KEY` is set.
+All non-health endpoints require the `X-ContextGuard-Key` header when `CONTEXTGUARD_API_KEY` is set.
 
 ```
-X-FactGuard-Key: <shared-secret>
+X-ContextGuard-Key: <shared-secret>
 ```
 
 ### Extension build pairing
 
-When shipping the extension, set the extension build variable `VITE_BACKEND_API_KEY` to the same value as backend `FACTGUARD_API_KEY`.
+When shipping the extension, set the extension build variable `VITE_BACKEND_API_KEY` to the same value as backend `CONTEXTGUARD_API_KEY`.
 
-- Backend runtime: `FACTGUARD_API_KEY=mysecret`
+- Backend runtime: `CONTEXTGUARD_API_KEY=mysecret`
 - Extension build-time: `VITE_BACKEND_API_KEY=mysecret`
 
 If these values do not match, backend requests from the extension return `401`.
@@ -78,9 +78,9 @@ curl -X POST http://localhost:8080/crawl \
 With API key enabled:
 
 ```bash
-export FACTGUARD_API_KEY=mysecret
+export CONTEXTGUARD_API_KEY=mysecret
 curl -X POST http://localhost:8080/domain_verify \
   -H 'Content-Type: application/json' \
-  -H 'X-FactGuard-Key: mysecret' \
+  -H 'X-ContextGuard-Key: mysecret' \
   -d '{"url":"https://www.bbc.com/","language":"English"}'
 ```

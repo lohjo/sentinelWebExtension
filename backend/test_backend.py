@@ -22,9 +22,9 @@ def _set_openai_key(monkeypatch):
 
 @pytest.fixture()
 def client_no_auth():
-    """TestClient with no FACTGUARD_API_KEY set (open mode)."""
+    """TestClient with no CONTEXTGUARD_API_KEY set (open mode)."""
     # Ensure key is cleared before importing app
-    os.environ.pop("FACTGUARD_API_KEY", None)
+    os.environ.pop("CONTEXTGUARD_API_KEY", None)
     # Re-import to get a fresh app instance without cached key
     import importlib
     import sys
@@ -37,8 +37,8 @@ def client_no_auth():
 
 @pytest.fixture()
 def client_with_auth(monkeypatch):
-    """TestClient with FACTGUARD_API_KEY=testsecret."""
-    monkeypatch.setenv("FACTGUARD_API_KEY", "testsecret")
+    """TestClient with CONTEXTGUARD_API_KEY=testsecret."""
+    monkeypatch.setenv("CONTEXTGUARD_API_KEY", "testsecret")
     import importlib
     import sys
     for mod in list(sys.modules.keys()):
@@ -74,7 +74,7 @@ def test_correct_api_key_passes_middleware(client_with_auth):
     with patch("main.website_verify_with_openai", new=AsyncMock(return_value={"Verdict": "Unverified"})):
         resp = client_with_auth.post(
             "/domain_verify",
-            headers={"X-FactGuard-Key": "testsecret"},
+            headers={"X-ContextGuard-Key": "testsecret"},
             json={"url": "https://example.com", "language": "English"},
         )
     assert resp.status_code == 200
@@ -83,7 +83,7 @@ def test_correct_api_key_passes_middleware(client_with_auth):
 def test_wrong_api_key_returns_401(client_with_auth):
     resp = client_with_auth.post(
         "/domain_verify",
-        headers={"X-FactGuard-Key": "wrongkey"},
+        headers={"X-ContextGuard-Key": "wrongkey"},
         json={"url": "https://example.com", "language": "English"},
     )
     assert resp.status_code == 401
@@ -97,12 +97,12 @@ def test_crawl_requires_matching_api_key(client_with_auth):
         )
         wrong = client_with_auth.post(
             "/crawl",
-            headers={"X-FactGuard-Key": "wrongkey"},
+            headers={"X-ContextGuard-Key": "wrongkey"},
             json={"url": "https://example.com", "language": "English"},
         )
         good = client_with_auth.post(
             "/crawl",
-            headers={"X-FactGuard-Key": "testsecret"},
+            headers={"X-ContextGuard-Key": "testsecret"},
             json={"url": "https://example.com", "language": "English"},
         )
 

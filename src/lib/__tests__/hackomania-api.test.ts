@@ -2,8 +2,8 @@ import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { loginWithEmailAndPassword } from '../hackomania-api';
 
 vi.mock('../config', () => ({
-  FACTGUARD_API_BASE: 'http://localhost:3000',
-  FACTGUARD_LOGIN_PATH: '/api/auth/login',
+  CONTEXTGUARD_API_BASE: 'http://localhost:3000',
+  CONTEXTGUARD_LOGIN_PATH: '/api/auth/login',
 }));
 
 describe('hackomania-api loginWithEmailAndPassword', () => {

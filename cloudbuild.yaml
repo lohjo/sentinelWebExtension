@@ -1,53 +1,101 @@
 steps:
-  # Build backend Docker image
-  - name: 'gcr.io/cloud-builders/docker'
+  # ---------------------------------------------------------------------------
+  # Backend: build, push, deploy
+  # ---------------------------------------------------------------------------
+  - id: backend-build
+    name: 'gcr.io/cloud-builders/docker'
     args:
       - build
       - -t
-      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/factguard-backend:$COMMIT_SHA
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/contextguard-backend:$COMMIT_SHA
       - -t
-      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/factguard-backend:latest
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/contextguard-backend:latest
       - ./backend
 
-  # Push to Artifact Registry
-  - name: 'gcr.io/cloud-builders/docker'
+  - id: backend-push
+    name: 'gcr.io/cloud-builders/docker'
     args:
       - push
       - --all-tags
-      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/factguard-backend
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/contextguard-backend
+    waitFor: ['backend-build']
 
-  # Deploy to Cloud Run
-  - name: 'gcr.io/cloud-builders/gcloud'
+  - id: backend-deploy
+    name: 'gcr.io/cloud-builders/gcloud'
     args:
       - run
       - deploy
-      - factguard-backend
-      - --image=asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/factguard-backend:$COMMIT_SHA
+      - contextguard-backend
+      - --image=asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/contextguard-backend:$COMMIT_SHA
       - --region=asia-southeast1
       - --platform=managed
       - --allow-unauthenticated
-      - --set-env-vars=SEA_LION_API_KEY=$$sealion-api-key,FACTGUARD_API_KEY=$$factguard-api-key,GEMINI_API_KEY=$$gemini-api-key,GROQ_API_KEY=$$groq-api-key-2
-
+      - --set-env-vars=SEA_LION_API_KEY=$$sealion-api-key,CONTEXTGUARD_API_KEY=$$contextguard-api-key,GEMINI_API_KEY=$$gemini-api-key,GROQ_API_KEY=$$groq-api-key-2
     secretEnv:
       - sealion-api-key
-      - factguard-api-key
+      - contextguard-api-key
       - gemini-api-key
       - groq-api-key-2
+    waitFor: ['backend-push']
+
+  # ---------------------------------------------------------------------------
+  # Frontend: build, push, deploy
+  # ---------------------------------------------------------------------------
+  - id: frontend-build
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - build
+      - -t
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/frontend/contextguard-frontend:$COMMIT_SHA
+      - -t
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/frontend/contextguard-frontend:latest
+      - ./frontend
+
+  - id: frontend-push
+    name: 'gcr.io/cloud-builders/docker'
+    args:
+      - push
+      - --all-tags
+      - asia-southeast1-docker.pkg.dev/$PROJECT_ID/frontend/contextguard-frontend
+    waitFor: ['frontend-build']
+
+  - id: frontend-deploy
+    name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - run
+      - deploy
+      - contextguard-frontend
+      - --image=asia-southeast1-docker.pkg.dev/$PROJECT_ID/frontend/contextguard-frontend:$COMMIT_SHA
+      - --region=asia-southeast1
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --set-env-vars=DATABASE_URL=$$database-url,JWT_SECRET=$$jwt-secret
+    secretEnv:
+      - database-url
+      - jwt-secret
+    waitFor: ['frontend-push']
 
 availableSecrets:
   secretManager:
     - versionName: projects/$PROJECT_ID/secrets/sealion-api-key/versions/latest
       env: sealion-api-key
-    - versionName: projects/$PROJECT_ID/secrets/factguard-api-key/versions/latest
-      env: factguard-api-key
+    - versionName: projects/$PROJECT_ID/secrets/contextguard-api-key/versions/latest
+      env: contextguard-api-key
     - versionName: projects/$PROJECT_ID/secrets/gemini-api-key/versions/latest
       env: gemini-api-key
     - versionName: projects/$PROJECT_ID/secrets/groq-api-key-2/versions/latest
       env: groq-api-key-2
+    - versionName: projects/$PROJECT_ID/secrets/database-url/versions/latest
+      env: database-url
+    - versionName: projects/$PROJECT_ID/secrets/jwt-secret/versions/latest
+      env: jwt-secret
 
 images:
-  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/factguard-backend:$COMMIT_SHA
-  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/factguard-backend:latest
+  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/contextguard-backend:$COMMIT_SHA
+  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/backend/contextguard-backend:latest
+  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/frontend/contextguard-frontend:$COMMIT_SHA
+  - asia-southeast1-docker.pkg.dev/$PROJECT_ID/frontend/contextguard-frontend:latest
 
 options:
   logging: CLOUD_LOGGING_ONLY

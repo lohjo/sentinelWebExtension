@@ -1,0 +1,60 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.userSection {
+  display: flex;
+  align-items: center;
+}
+
+.profilePic {
+  background-color: rgb(118, 118, 246);
+  width: 30px;
+  height: 30px;
+  border-radius: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  font-weight: 700;
+}
+
+.username {
+  font-weight: 600;
+  margin-left: 10px;
+}
+
+.time {
+  font-weight: 400;
+  font-size: 12px;
+  margin-left: 10px;
+}
+
+.commentSection {
+  display: flex;
+}
+
+.indent {
+  width: 40px;
+}
+
+.comments {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.row {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.comment {
+}
